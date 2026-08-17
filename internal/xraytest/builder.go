@@ -7,6 +7,14 @@ import (
 	"strings"
 )
 
+// DefaultCipherSuites is the confirmed production TLS cipher suite list.
+// Used whenever a VLESSConfig does not specify its own CipherSuites.
+const DefaultCipherSuites = "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256:TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256:TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA:TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA:TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256:TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256"
+
+// DefaultFingerprint is the confirmed production TLS fingerprint.
+// Used whenever a VLESSConfig does not specify its own Fingerprint.
+const DefaultFingerprint = "unsafe"
+
 // BuildXrayConfig generates a minimal xray-core JSON config from a VLESSConfig.
 // It creates a SOCKS inbound on the given port and a VLESS outbound.
 func BuildXrayConfig(cfg *VLESSConfig, socksPort int) ([]byte, error) {
@@ -60,7 +68,6 @@ func BuildXrayConfig(cfg *VLESSConfig, socksPort int) ([]byte, error) {
 			},
 		},
 	}
-
 	return json.MarshalIndent(config, "", "  ")
 }
 
@@ -108,7 +115,6 @@ func buildVLESSOutbound(cfg *VLESSConfig) map[string]interface{} {
 	if cfg.Flow != "" {
 		users[0]["flow"] = cfg.Flow
 	}
-
 	return map[string]interface{}{
 		"tag":      "proxy",
 		"protocol": "vless",
@@ -147,16 +153,26 @@ func buildStreamSettings(cfg *VLESSConfig) map[string]interface{} {
 		"network":  cfg.Network,
 		"security": cfg.Security,
 	}
-
 	// TLS settings
 	if cfg.Security == "tls" {
 		tls := map[string]interface{}{}
 		if cfg.SNI != "" {
 			tls["serverName"] = cfg.SNI
 		}
-		if cfg.Fingerprint != "" {
-			tls["fingerprint"] = cfg.Fingerprint
+		// Fingerprint always defaults to the confirmed production value
+		// ("unsafe") unless the config explicitly overrides it.
+		fp := cfg.Fingerprint
+		if fp == "" {
+			fp = DefaultFingerprint
 		}
+		tls["fingerprint"] = fp
+		// cipherSuites always defaults to the confirmed production list
+		// unless the config explicitly overrides it.
+		cs := cfg.CipherSuites
+		if cs == "" {
+			cs = DefaultCipherSuites
+		}
+		tls["cipherSuites"] = cs
 		// allowInsecure was removed from xray-core after 2026-06-01. When dialing
 		// a literal IP, xray expects verifyPeerCertByName instead.
 		if net.ParseIP(cfg.Address) != nil {
@@ -169,7 +185,6 @@ func buildStreamSettings(cfg *VLESSConfig) map[string]interface{} {
 		}
 		stream["tlsSettings"] = tls
 	}
-
 	// Transport settings
 	switch cfg.Network {
 	case "ws":
@@ -184,7 +199,6 @@ func buildStreamSettings(cfg *VLESSConfig) map[string]interface{} {
 			}
 		}
 		stream["wsSettings"] = ws
-
 	case "grpc":
 		grpc := map[string]interface{}{
 			"serviceName": cfg.ServiceName,
@@ -196,7 +210,6 @@ func buildStreamSettings(cfg *VLESSConfig) map[string]interface{} {
 			grpc["multiMode"] = true
 		}
 		stream["grpcSettings"] = grpc
-
 	case "xhttp", "splithttp":
 		xhttp := map[string]interface{}{
 			"path": cfg.Path,
@@ -211,8 +224,40 @@ func buildStreamSettings(cfg *VLESSConfig) map[string]interface{} {
 		}
 		stream["xhttpSettings"] = xhttp
 	}
-
+	// Fragment/obfuscation layer ("finalmask" in the production config).
+	// Applied by default; set cfg.DisableFragment to skip it.
+	if !cfg.DisableFragment {
+		stream["finalmask"] = defaultFragmentSettings()
+	}
 	return stream
+}
+
+// defaultFragmentSettings returns the confirmed production fragment
+// ("finalmask") layer: two TCP fragment stages that split the TLS
+// ClientHello and follow-up packets to evade DPI.
+func defaultFragmentSettings() map[string]interface{} {
+	return map[string]interface{}{
+		"tcp": []map[string]interface{}{
+			{
+				"type": "fragment",
+				"settings": map[string]interface{}{
+					"packets":  "tlshello",
+					"lengths":  []string{"5", "94", "1"},
+					"delays":   []string{"0"},
+					"maxSplit": "0",
+				},
+			},
+			{
+				"type": "fragment",
+				"settings": map[string]interface{}{
+					"packets":  "1-1",
+					"lengths":  []string{"109", "1"},
+					"delays":   []string{"1"},
+					"maxSplit": "355",
+				},
+			},
+		},
+	}
 }
 
 func peerCertNames(cfg *VLESSConfig) string {

@@ -41,7 +41,12 @@ type VLESSConfig struct {
 	Fingerprint string
 	ALPN        []string
 	Insecure    bool
-
+	// CipherSuites overrides the default production cipherSuites list.
+	// Empty means DefaultCipherSuites (see builder.go) is used.
+	CipherSuites string
+	// DisableFragment skips the finalmask/fragment obfuscation layer.
+	// Default is false — the fragment layer is applied by default.
+	DisableFragment bool
 	// Metadata
 	Remark string
 
