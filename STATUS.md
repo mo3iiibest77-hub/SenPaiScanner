@@ -238,7 +238,7 @@ The scanner now uses the actual production fragment configuration:
 }
 
 The production custom cipher suite list and fingerprint: "unsafe" are also applied by internal/xraytest/builder.go.
-E2E result
+### E2E result
 After the Xray-core update, the exact same production configuration and candidate IP were tested five consecutive times.
 All five tests succeeded.
 Observed results:
@@ -254,7 +254,7 @@ No Xray configuration/build errors remained
 This establishes that the scanner's ValidateConfig() path can successfully start Xray-core and pass real traffic through the production VLESS + TLS + WS + fragment + cipher-suite + unsafe-fingerprint configuration.
 This is a real end-to-end validation from the test environment, not merely compilation or a TCP/TLS probe.
 It does NOT establish universal usability across all ISPs or networks. Client-network validation remains a separate concern and must be measured from the actual restricted user network when evaluating ISP-specific behavior.
-Full repository verification
+## Full repository verification
 After the Xray-core update:
 go test -ldflags='-checklinkname=0' ./... -count=1
 completed successfully for the entire SenPaiScanner repository.
@@ -267,11 +267,11 @@ internal/ui
 internal/xraytest
 No test package reported a failure.
 The temporary .e2e-baseline test harness was removed after validation.
-Git state
+## Git state
 The successful Xray-core dependency update was committed and pushed to:
 github.com/mo3iiibest77-hub/SenPaiScanner
 The fork's main branch now contains the completed dependency update and the associated go.sum changes.
-Current conclusion
+## Current conclusion
 The previously identified xraytest production-configuration gap is now closed and the resulting validation path has been exercised successfully against a real production VLESS endpoint.
 The scanner is therefore ready for the next project phase.
 The next engineering step remains scoring/ranking and result persistence, followed by eventual PattNG-side integration. Do not treat the current five successful runs as proof that every Cloudflare candidate or every ISP will work; the validation layer is now proven functional, while broader network/ISP coverage still requires representative client-side testing.
