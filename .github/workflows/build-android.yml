@@ -113,10 +113,18 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace clean testDebugUnitTest assembleDebugAndroidTest lintRelease assembleRelease
 
+      - name: Verify Go mobile AAR
+        shell: bash
+        run: |
+          test -s android/app/libs/senpaiscanner.aar
+          file android/app/libs/senpaiscanner.aar
+          ls -lh android/app/libs/senpaiscanner.aar
+
       - name: Prepare Android artifacts
         shell: bash
         run: |
           mkdir -p release-artifacts
+          cp android/app/libs/senpaiscanner.aar "release-artifacts/SenPaiScanner-${VERSION}-mobile.aar"
           find android/app/build/outputs/apk/release -name '*.apk' -print0 | while IFS= read -r -d '' apk; do
             abi="$(basename "$apk" | sed -E 's/^app-(.*)-release\.apk$/\1/')"
             cp "$apk" "release-artifacts/SenPaiScanner-${VERSION}-android-${abi}.apk"
