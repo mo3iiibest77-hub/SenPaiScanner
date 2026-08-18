@@ -20,6 +20,6 @@ mkdir -p app/libs
 
 # Build the AAR
 echo "Running gomobile bind..."
-gomobile bind -v -target=android/arm64,android/arm -androidapi 21 -javapkg=com.matinsenpai.senpaiscanner -o app/libs/senpaiscanner.aar ../mobile
+GOFLAGS="${GOFLAGS:-} -ldflags=-checklinkname=0" gomobile bind -v -target=android/arm64,android/arm -androidapi 21 -javapkg=com.matinsenpai.senpaiscanner -o app/libs/senpaiscanner.aar ../mobile
 
 echo "Successfully built senpaiscanner.aar!"
